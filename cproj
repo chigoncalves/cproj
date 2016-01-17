@@ -35,7 +35,7 @@ sub process_templates {
 
   my @param_vars = keys %params;
   my ($IN, $OUT) = (undef, undef);
-  my @templates = (catdir ('include', 'conf.h.in'), 'CMakeLists.txt');
+  my @templates = (catdir ('include', 'conf.h.in'), 'CMakeLists.txt', 'readme.rst');
   for my $file (@templates) {
     open ($IN, '<', catdir (BASE_DIR, $file));
     open ($OUT, '>', catdir ($path, $file));
