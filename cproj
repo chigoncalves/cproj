@@ -1,41 +1,45 @@
 #!/usr/bin/env perl
+
 use 5.020;
 use warnings;
 use autodie;
+use feature q/signatures/;
+use subs qw/usage path_abs name_for_macro process_templates/;
+no warnings q/experimental::signatures/;
 
 use Cwd q/cwd/;
-use Getopt::Long q/GetOptions/;
 use File::Spec::Functions q/catdir/;
 use File::Copy::Recursive qw/fcopy dircopy/;
 use File::Path q/make_path/;
 use File::Basename q/basename/;
 
-use constant BASE_DIR => catdir $ENV{SLNC_COD_DIR}, 'cproj';;
-use constant CWD => cwd;
+use constant {
+  BASE_DIR => catdir ($ENV{SLNC_COD_DIR}, 'cproj'),
+  CWD => cwd,
+};
 
-sub usage {
+sub usage () {
   die "[USAGE]: cproj new PROJECT-NAME\n";
 }
 
-sub name_for_macro {
-  my $name = uc pop;
+sub name_for_macro ($name) {
+  $name = uc $name;
   $name =~ s/(\W|^\d)/_/g;
-  $name =~ s/_{1,}/_/g;
+  $name =~ s/_+/_/g;
   $name =~ s/(^_|_$)//g;
+
   return $name;
 }
 
-sub get_abs_path {
-  $ARGV[1] =~ m|^(~?/)| ? $ARGV[1] : catdir CWD, $ARGV[1];
+sub path_abs ($path) {
+  return $path =~ m|^(~?/)| ? $path : catdir CWD, $path;
 }
 
-sub process_templates {
-  my %params = @_;
-  my $path = get_abs_path;
+sub process_templates (%params) {
+  my $path = path_abs delete $params{path};
 
-  my @param_vars = keys %params;
-  my ($IN, $OUT) = (undef, undef);
-  my @templates = (catdir ('include', 'conf.h.in'), 'CMakeLists.txt', 'readme.rst');
+  my ($IN, $OUT, @param_vars) = (undef, undef, (keys %params));
+  my @templates = (catdir ('include', 'config.h.in'), 'CMakeLists.txt', 'readme.rst');
   for my $file (@templates) {
     open ($IN, '<', catdir (BASE_DIR, $file));
     open ($OUT, '>', catdir ($path, $file));
@@ -55,19 +59,17 @@ sub process_templates {
 
 usage if scalar @ARGV != 2 || $ARGV[0] ne 'new';
 
-my $proj_name = basename $ARGV[1];
+my ($proj_name, $path) = (basename ($ARGV[1]), path_abs $ARGV[1]);
 
-my $abs_path = get_abs_path;
-
-die "`$proj_name` exists! Try a diferent name.\n" if -e $abs_path;
+die "`$proj_name` exists! Try a diferent name.\n" if -e $path;
 
 make_path $proj_name;
 
 for my $dir (qw/include src doc lib cmake/) {
-  dircopy catdir(BASE_DIR, $dir), catdir ($abs_path, $dir);
+  dircopy catdir(BASE_DIR, $dir), catdir ($path, $dir);
 }
 
-fcopy catdir (BASE_DIR, 'readme.rst'), catdir ($abs_path, 'readme.rst');
+fcopy catdir (BASE_DIR, 'readme.rst'), catdir ($path, 'readme.rst');
 
 process_templates PROJECT => name_for_macro($proj_name), APP_NAME => $proj_name,
-	  USER => $ENV{USER}, EMAIL => "$ENV{USER}\@localhost";
+	  USER => $ENV{USER}, EMAIL => "$ENV{USER}\@localhost", path => $path;

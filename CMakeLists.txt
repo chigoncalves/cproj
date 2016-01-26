@@ -11,7 +11,7 @@ include_directories ("${CMAKE_BINARY_DIR}/include" "${CMAKE_SOURCE_DIR}/include"
 
 include (Utils)
 
-configure_file ("${CMAKE_SOURCE_DIR}/include/conf.h.in" "${CMAKE_BINARY_DIR}/include/conf.h")
+configure_file ("${CMAKE_SOURCE_DIR}/include/config.h.in" "${CMAKE_BINARY_DIR}/include/config.h")
 
 set (CMAKE_C_OUTPUT_EXTENSION ".obj")
 

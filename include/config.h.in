@@ -1,6 +1,9 @@
 // -*- mode : c -*-
+
 #ifndef %PROJECT%_INCLUDE_CONF
 #define %PROJECT%_INCLUDE_CONF 1
+
+#define PROJECT_NAME "@PROJECT_NAME@"
 
 #ifndef UNUSED
 #define UNUSED(var) ((void)var)
