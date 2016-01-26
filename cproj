@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 
 use 5.020;
-use warnings;
-use autodie;
+use warnings q/all/;
+use autodie q/:all/;
 use feature q/signatures/;
 use subs qw/usage path_abs name_for_macro process_templates/;
 no warnings q/experimental::signatures/;
@@ -61,7 +61,7 @@ usage if scalar @ARGV != 2 || $ARGV[0] ne 'new';
 
 my ($proj_name, $path) = (basename ($ARGV[1]), path_abs $ARGV[1]);
 
-die "`$proj_name` exists! Try a diferent name.\n" if -e $path;
+die "`$proj_name' exists! Try a diferent name.\n" if -e $path;
 
 make_path $proj_name;
 
