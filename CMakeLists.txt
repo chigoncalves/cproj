@@ -7,13 +7,15 @@ project (%APP_NAME% LANGUAGES C)
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-include_directories ("${CMAKE_BINARY_DIR}/include" "${CMAKE_SOURCE_DIR}/include")
+include_directories (
+  ${CMAKE_BINARY_DIR}/include
+  ${CMAKE_SOURCE_DIR}/include
+  ${CMAKE_SOURCE_DIR}/src
+)
 
 include (Utils)
 
 configure_file ("${CMAKE_SOURCE_DIR}/include/config.h.in" "${CMAKE_BINARY_DIR}/include/config.h")
-
-set (CMAKE_C_OUTPUT_EXTENSION ".obj")
 
 set (SOURCES src/main.c)
 add_executable (${PROJECT_NAME} ${SOURCES})
