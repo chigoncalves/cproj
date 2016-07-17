@@ -4,28 +4,63 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE "Release")
 endif ()
 
+set (COMPILER_SUPPORTS_SAN)
+set (CMAKE_WARN_DEPRECATED ON)
+
+include (CMakePrintHelpers)
+macro (list_stringfy varname)
+  list (REMOVE_DUPLICATES ${varname})
+  string (REPLACE ";" " " ${varname} "${${varname}}")
+endmacro ()
+
+if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
+  set (CLANG ON)
+  if (CMAKE_C_COMPILER_VERSION VERSION_GREATER "3.3.0")
+    set (COMPILER_SUPPORTS_SAN ON)
+  endif ()
+elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  set (GNU ON)
+  if (CMAKE_C_COMPILER_VERSION VERSION_GREATER "4.8.0")
+    set (COMPILER_SUPPORTS_SAN ON)
+  endif ()
+endif ()
+
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set (CMAKE_EXPORT_COMPILE_COMMANDS 1)
+  set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
   set (DEBUG 1)
-  set (TINTO_DEVEL_MODE 1)
   unset (NDEBUG)
-  mark_as_advanced (NDEBUG TINTO_DEVEL_MODE)
 
-  if (CMAKE_C_COMPILER_ID STREQUAL "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Wextra -Werror -std=c99 -pedantic")
-
+  option (ENABLE_SAN "Enable sanatizers." ON)
+  list (APPEND CMAKE_C_FLAGS_DEBUG -Wall -Wextra -Werror -std=c99
+                                   -pedantic)
+  if (COMPILER_SUPPORTS_SAN)
+    set (SAN_BLACKLIST_FILE "${CMAKE_SOURCE_DIR}/blacklists.txt")
+    list (APPEND CMAKE_C_FLAGS_DEBUG -fPIE )
+    list (APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG -fno-omit-frame-pointer
+                                              -pie)
     if (ENABLE_SAN)
       string (TOLOWER ${ENABLE_SAN} ENABLE_SAN)
-    else ()
-      set (ENABLE_SAN "off")
+      list (APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG -pie)
+    endif ()
+
+    if (CLANG)
+      list (APPEND CMAKE_C_FLAGS_DEBUG
+	           -fsanitize-blacklist="${SAN_BLACKLIST_FILE}")
     endif ()
 
     if (${ENABLE_SAN} STREQUAL "asan" OR ${ENABLE_SAN} STREQUAL "on")
-      set (CMAKE_EXE_LINKER_FLAGS "-fno-omit-frame-pointer -fsanitize=address")
+      list (APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG -fsanitize=address
+	                                        -fsanitize=undefined)
     elseif (${ENABLE_SAN} STREQUAL "msan")
-      set (CMAKE_EXE_LINKER_FLAGS "-fno-omit-frame-pointer -fsanitize=memory")
+      list (APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG -fsanitize=memory)
     elseif (${ENABLE_SAN} STREQUAL "tsan")
-      set (CMAKE_EXE_LINKER_FLAGS "-fno-omit-frame-pointer -fsanitize=thread")
+      list (APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG -fsanitize=thread)
     endif ()
   endif ()
+
+  list_stringfy (CMAKE_C_FLAGS_DEBUG)
+  list_stringfy (CMAKE_EXE_LINKER_FLAGS_DEBUG)
 endif ()
+
+mark_as_advanced (COMILER_SUPPORTS_SAN
+                  CLANG GNU DEBUG)

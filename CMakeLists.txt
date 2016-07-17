@@ -5,6 +5,8 @@ Try running `cmake' . -B<build-dir>]])
 endif ()
 
 cmake_minimum_required (VERSION 3.0)
+cmake_policy (SET CMP0054 NEW)
+
 project (%APP_NAME% LANGUAGES C)
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
