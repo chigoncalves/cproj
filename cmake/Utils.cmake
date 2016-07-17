@@ -8,15 +8,6 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE "Release")
 endif ()
 
-set (COMPILER_SUPPORTS_SAN)
-set (CMAKE_WARN_DEPRECATED ON)
-
-include (CMakePrintHelpers)
-macro (list_stringfy varname)
-  list (REMOVE_DUPLICATES ${varname})
-  string (REPLACE ";" " " ${varname} "${${varname}}")
-endmacro ()
-
 if (CMAKE_C_COMPILER_ID STREQUAL "Clang")
   set (CLANG ON)
   if (CMAKE_C_COMPILER_VERSION VERSION_GREATER "3.3.0")
@@ -30,6 +21,15 @@ elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
 endif ()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set (COMPILER_SUPPORTS_SAN)
+
+  macro (list_stringfy varname)
+    list (REMOVE_DUPLICATES ${varname})
+    string (REPLACE ";" " " ${varname} "${${varname}}")
+  endmacro ()
+
+  set (CMAKE_WARN_DEPRECATED ON)
+  set (CMAKE_ERROR_DEPRECATED ON)
   set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
   set (DEBUG 1)
   unset (NDEBUG)
