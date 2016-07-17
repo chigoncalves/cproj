@@ -4,8 +4,7 @@
 #include <stdlib.h>
 
 int main (int argc, char* argv[]) {
-  UNUSED (argc);
-  UNUSED (argv);
+  UNUSED (argc, argv);
 
   puts (PROJECT_NAME);
 
