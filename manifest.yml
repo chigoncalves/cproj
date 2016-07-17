@@ -6,3 +6,4 @@ manifest:
   - docs/man.1
   - src/main.c
   - src/config.h.in
+  - blacklists.txt
