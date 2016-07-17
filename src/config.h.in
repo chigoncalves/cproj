@@ -5,9 +5,13 @@
 
 #define PROJECT_NAME "@PROJECT_NAME@"
 
+#ifdef __cplusplus
+#define UNUSED(var) (static_cast<void> (var))
+#else
 #ifndef UNUSED
 #define UNUSED(var) ((void)var)
 #endif // UNUSED
+#endif // __cplusplus
 
 #cmakedefine DEBUG 1
 

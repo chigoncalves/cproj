@@ -2,7 +2,7 @@
 
 use 5.020;
 use warnings q/all/;
-use autodie q/:all/;
+# use autodie q/:all/;
 use feature q/signatures/;
 use subs qw/usage path_abs name_for_macro process_templates/;
 no warnings q/experimental::signatures/;
@@ -14,7 +14,7 @@ use File::Path q/make_path/;
 use File::Basename q/basename/;
 
 use constant {
-  BASE_DIR => catdir ($ENV{SLNC_COD_DIR}, 'cproj'),
+  BASE_DIR => catdir ($ENV{CHI_COD_DIR}, 'cproj'),
   CWD => cwd,
 };
 
@@ -39,7 +39,7 @@ sub process_templates (%params) {
   my $path = path_abs delete $params{path};
 
   my ($IN, $OUT, @param_vars) = (undef, undef, (keys %params));
-  my @templates = (catdir ('include', 'config.h.in'), 'CMakeLists.txt', 'readme.rst');
+  my @templates = (catdir ('src', 'config.h.in'), 'CMakeLists.txt', 'readme.rst');
   for my $file (@templates) {
     open ($IN, '<', catdir (BASE_DIR, $file));
     open ($OUT, '>', catdir ($path, $file));
@@ -65,7 +65,7 @@ die "`$proj_name' exists! Try a diferent name.\n" if -e $path;
 
 make_path $proj_name;
 
-for my $dir (qw/include src doc lib cmake/) {
+for my $dir (qw/src cmake/) {
   dircopy catdir(BASE_DIR, $dir), catdir ($path, $dir);
 }
 

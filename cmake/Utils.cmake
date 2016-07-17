@@ -1,3 +1,5 @@
+(set CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE "Release")
 endif ()
@@ -11,6 +13,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
   if (CMAKE_C_COMPILER_ID STREQUAL "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     set (CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -Wall -Wextra -Werror -std=c99 -pedantic")
+
     if (ENABLE_SAN)
       string (TOLOWER ${ENABLE_SAN} ENABLE_SAN)
     else ()
