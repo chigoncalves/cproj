@@ -1,0 +1,8 @@
+---
+manifest:
+  - CMakeLists.txt
+  - readme.rst
+  - cmake/Utils.cmake
+  - docs/man.1
+  - src/main.c
+  - src/config.h.in

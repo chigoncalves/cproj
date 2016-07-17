@@ -1,53 +1,59 @@
 #!/usr/bin/env perl
 
+package CProject;
 use 5.020;
 use warnings q/all/;
-# use autodie q/:all/;
-use feature q/signatures/;
-use subs qw/usage path_abs name_for_macro process_templates/;
-no warnings q/experimental::signatures/;
+use autodie;
 
-use Cwd q/cwd/;
-use File::Spec::Functions q/catdir/;
-use File::Copy::Recursive qw/fcopy dircopy/;
-use File::Path q/make_path/;
-use File::Basename q/basename/;
+use Cwd qw/abs_path/;
+use File::Basename qw/dirname/;
+use File::Path qw/make_path/;
+use File::Spec::Functions qw/catdir/;
+use YAML::Tiny;
+use File::Temp qw/:seekable/;
 
-use constant {
-  BASE_DIR => catdir ($ENV{CHI_COD_DIR}, 'cproj'),
-  CWD => cwd,
-};
+sub new {
+  my $class = shift;
+  my $self = {
+       base_dir => dirname abs_path (__FILE__),
+       manifest => [],
+  };
 
-sub usage () {
-  die "[USAGE]: cproj new PROJECT-NAME\n";
+  do {
+    my $doc = YAML::Tiny->read (catdir ($self->{base_dir},
+					'manifest.yml'));
+    $self->{manifest} = \@{${$doc->[0]}{'manifest'}};
+
+  };
+
+  if (scalar @main::ARGV != 2 || $main::ARGV[0] ne 'new') {
+    CProjectCli::Utils->usage;
+  }
+
+  $self->{project_name} = $main::ARGV[1];
+  $self->{project_dirname} = CProjectCli::Utils->
+    convert_to_file_name ($self->{project_name});
+  $self->{project_dirpath} = abs_path $self->{project_dirname};
+
+  bless $self, $class;
 }
 
-sub name_for_macro ($name) {
-  $name = uc $name;
-  $name =~ s/(\W|^\d)/_/g;
-  $name =~ s/_+/_/g;
-  $name =~ s/(^_|_$)//g;
+sub process_templates {
+  my $self = shift;
+  my %params = @_;
 
-  return $name;
-}
-
-sub path_abs ($path) {
-  return $path =~ m|^(~?/)| ? $path : catdir CWD, $path;
-}
-
-sub process_templates (%params) {
-  my $path = path_abs delete $params{path};
-
+  my $files = delete $params{files};
   my ($IN, $OUT, @param_vars) = (undef, undef, (keys %params));
-  my @templates = (catdir ('src', 'config.h.in'), 'CMakeLists.txt', 'readme.rst');
-  for my $file (@templates) {
-    open ($IN, '<', catdir (BASE_DIR, $file));
-    open ($OUT, '>', catdir ($path, $file));
+  # my @templates = ());
+
+  for my $file (@$files) {
+    open ($IN, '<', catdir ($self->{base_dir}, $file));
+    open ($OUT, '>', catdir ($self->{project_dirpath}, $file));
 
     while (my $line = readline $IN) {
       chomp $line;
       for my $param (@param_vars) {
-	$line =~ s/%$param%/$params{$param}/g;
+  	$line =~ s/%$param%/$params{$param}/g;
       }
       say {$OUT} $line;
     }
@@ -57,19 +63,108 @@ sub process_templates (%params) {
   }
 }
 
-usage if scalar @ARGV != 2 || $ARGV[0] ne 'new';
+sub run {
+  my $self = shift;
 
-my ($proj_name, $path) = (basename ($ARGV[1]), path_abs $ARGV[1]);
+  if (-d $self->{project_dirpath}) {
+    die "`$self->{project_dirname}' exists! Try a diferent name.\n";
+  }
+  make_path $self->{project_dirpath};
 
-die "`$proj_name' exists! Try a diferent name.\n" if -e $path;
+  for my $dirent (@{$self->{manifest}}) {
+    my $src_path = catdir $self->{base_dir}, $dirent;
+    my $dest_path = catdir $self->{project_dirpath}, $dirent;
+    CProjectCli::Utils->copy_file ($src_path, $dest_path);
+  }
 
-make_path $proj_name;
+  $self->process_templates (files => ['CMakeLists.txt', 'readme.rst',
+				      catdir ('src', 'config.h.in')],
+			    APP_NAME => $self->{project_dirname},
+			    PROJECT => $self->{project_name},
+			    PROJECT_MACRO =>
+			    CProjectCli::Utils->
+			    convert_to_macro_identifier (
+			    $self->{project_dirname}),
+			    USER => $ENV{USER},
+			    EMAIL => "$ENV{USER}\@localhost");
 
-for my $dir (qw/src cmake/) {
-  dircopy catdir(BASE_DIR, $dir), catdir ($path, $dir);
+  my $fh = File::Temp->new (TEMPLATE => "cproj-XXXXXXXXX",
+			    SUFFIX => '.rst',
+			    CLEANUP => 1,
+			    TMPDIR => 1);
+
+  my $readme_fname = catdir $self->{project_dirpath}, 'readme.rst';
+
+  CProjectCli::Utils->copy_file ($readme_fname, $fh->filename, 1);
+
+  open (my $README_FH, '>', $readme_fname);
+  $fh->seek (0, SEEK_SET);
+
+  my $section_set = 0;
+  while (my $line = $fh->getline ()) {
+    chomp $line;
+
+    next if $line =~ /^(#|\*|=|-|~){3,}/;
+
+    unless ($section_set) {
+      my $len = length ($line) + 2;
+      say {$README_FH} '#' x $len;
+      say {$README_FH} sprintf (' %s', $line);
+      say {$README_FH} '#' x $len;
+      $section_set = 1;
+      next;
+    }
+
+    say {$README_FH} $line;
+  }
 }
 
-fcopy catdir (BASE_DIR, 'readme.rst'), catdir ($path, 'readme.rst');
 
-process_templates PROJECT => name_for_macro($proj_name), APP_NAME => $proj_name,
-	  USER => $ENV{USER}, EMAIL => "$ENV{USER}\@localhost", path => $path;
+package CProjectCli::Utils;
+
+use 5.020;
+use warnings q/all/;
+use autodie;
+
+use File::Copy qw/copy/;
+use File::Basename qw/dirname/;
+use File::Path qw/make_path/;
+
+sub usage {
+  die "[USAGE]:\n\tcproj new <project-name>\n";
+}
+
+sub convert_to_macro_identifier {
+  shift;
+  my $name = uc shift;
+
+  $name =~ s/(\W|^\d)/_/g;
+  $name =~ s/_+/_/g;
+  $name =~ s/(^_|_$)//g;
+
+  return $name;
+}
+
+sub convert_to_file_name {
+  my $name = lc $_[1];
+  $name =~ s/(\s|_)+/-/g;
+
+  return $name;
+}
+
+sub copy_file {
+  my ($self, $src, $dest, $overwrite) = @_;
+
+  return if -e $dest && !$overwrite;
+
+  if (-f $src) {
+    my $dest_dname = dirname $dest;
+    make_path $dest_dname unless -e $dest_dname;
+    copy $src, $dest;
+  }
+}
+
+
+package main;
+
+CProject->new->run;

@@ -1,5 +1,4 @@
-==========
- %PROJECT%
-==========
+%PROJECT%
+*********
 
 Generated content.
