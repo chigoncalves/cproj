@@ -36,6 +36,10 @@ _UNUSED_LEVEL_3, _UNUSED_LEVEL_2, _UNUSED_LEVEL_1, 0
 #define _UNUSED_CALL(level, ... ) level (__VA_ARGS__)
 #cmakedefine DEBUG 1
 
+#define begin
+#define block
+#define progn
+
 #ifndef NUL
 #define NUL '\0'
 #endif // NUL
