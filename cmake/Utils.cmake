@@ -22,8 +22,6 @@ elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
 endif ()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set (COMPILER_SUPPORTS_SAN)
-
   macro (list_stringfy varname)
     list (REMOVE_DUPLICATES ${varname})
     string (REPLACE ";" " " ${varname} "${${varname}}")
