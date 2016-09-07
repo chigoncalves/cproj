@@ -35,7 +35,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 
   option (ENABLE_SAN "Enable sanatizers." ON)
   list (APPEND CMAKE_C_FLAGS_DEBUG -Wall -Wextra -Werror -std=c99
-                                   -pedantic)
+                                   -pedantic -Wwrite-strings)
   if (COMPILER_SUPPORTS_SAN)
     set (SAN_BLACKLIST_FILE "${CMAKE_SOURCE_DIR}/blacklists.txt")
     list (APPEND CMAKE_C_FLAGS_DEBUG -fPIE )

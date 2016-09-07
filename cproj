@@ -11,6 +11,7 @@ use File::Path qw/make_path/;
 use File::Spec::Functions qw/catdir/;
 use YAML::Tiny;
 use File::Temp qw/:seekable/;
+use Env qw/HOME/;
 
 sub new {
   my $class = shift;
@@ -78,6 +79,7 @@ sub run {
   }
 
   $self->process_templates (files => ['CMakeLists.txt', 'readme.rst',
+				      '.dir-locals.el',
 				      catdir ('src', 'config.h.in')],
 			    APP_NAME => $self->{project_dirname},
 			    PROJECT => $self->{project_name},
@@ -86,7 +88,9 @@ sub run {
 			    convert_to_macro_identifier (
 			    $self->{project_dirname}),
 			    USER => $ENV{USER},
-			    EMAIL => "$ENV{USER}\@localhost");
+			    EMAIL => "$ENV{USER}\@localhost",
+			    DIR_PATH => $self->{project_dirpath},
+			   );
 
   my $fh = File::Temp->new (TEMPLATE => "cproj-XXXXXXXXX",
 			    SUFFIX => '.rst',

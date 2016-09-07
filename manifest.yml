@@ -7,3 +7,4 @@ manifest:
   - src/main.c
   - src/config.h.in
   - blacklists.txt
+  - .dir-locals.el
