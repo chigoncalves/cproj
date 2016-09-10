@@ -1,4 +1,5 @@
-%PROJECT%
-*********
+#######
+ cproj
+#######
 
-%DESCRIPTION%
+Generates project skeleton for C and C++.

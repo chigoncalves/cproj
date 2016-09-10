@@ -1,237 +1,122 @@
 #!/usr/bin/env perl
 
-package CProject;
-use 5.020;
-use warnings q/all/;
-use autodie;
 
+package CliProject;
+use 5.024;
+use warnings;
+use autodie;
+use subs qw/__sanitize_file_name __get_macro_identifier/;
+
+use Carp qw/croak/;
 use Cwd qw/abs_path/;
 use File::Basename qw/dirname/;
+use File::Copy qw/copy/;
+use File::Copy::Recursive qw/dircopy/;
 use File::Path qw/make_path/;
 use File::Spec::Functions qw/catdir/;
-use YAML::Tiny;
 use File::Temp qw/:seekable/;
-use Env qw/HOME/;
-use Getopt::Long;
-use Carp qw/croak/;
+use Text::Trim qw/trim/;
+
 
 sub new {
   my $class = shift;
-  my $self = {
-       base_dir => dirname abs_path (__FILE__),
-       manifest => [],
-       language => 'C',
-       description => 'Simple Project.',
-  };
-
-  my $doc = YAML::Tiny->read (catdir ($self->{base_dir},
-				      'manifest.yml'));
-  $self->{manifest} = \@{${$doc->[0]}{'manifest'}};
-
-  my @ARGV = @main::ARGV;
-  if (scalar @ARGV < 2 || $ARGV[0] ne 'new') {
-    CProjectCli::Utils->usage;
-  }
-
-  shift @ARGV;
-  $self->{project_name} = shift @ARGV;
-  $self->{project_dirname} = CProjectCli::Utils->convert_to_file_name ($self->{project_name});
-  $self->{project_dirpath} = abs_path $self->{project_dirname};
-
-  my $parser = Getopt::Long::Parser->new;
-  my %options = (language => 'c',
-		 description => 'Simple Project.',
-		 qt => 0);
-  $parser->getoptionsfromarray (\@ARGV,
-				'language|l=s' => \$options{language},
-				'description|d=s' => \$options{description},
-				'qt|q' => \$options{qt},
-			       )
-    ;
-
-  $self->{language} = delete $options{language};
-  $self->{description} = delete $options{description};
-
-  my $valid_language = 0;
-  $self->{language} = uc $self->{language};
-  for my $lang (qw/C CC CXX CPP/) {
-    if ($lang eq $self->{language}) {
-      $valid_language = 1;
-      last;
-    }
-  }
-
-  unless ($valid_language) {
-    croak 'Invalid language! Language must be one of C or [CC, CXX, CPP]';
-  }
-
-  if ($self->{language} eq 'C') {
-    $self->{C} = {
-		  CONFIG => 'config.h',
-		  IO => 'stdio.h',
-		  STD => 'stdlib.h',
-		  SNIPPET => '  printf ("Project -> \"%s\".\n", PROJECT_NAME);',
-		  HEADER => 'h',
-		  SOURCE => 'c',
-		  UNUSED => '  UNUSED (argc, argv);\n',
-		  EXIT_STATUS => 'EXIT_SUCCESS',
-		  MORE_HEADERS => '',
-		 };
-
-  }
-  else {
-    $self->{language} = 'CXX';
-    $self->{CXX} = {
-		    CONFIG => 'config.hh',
-		    IO => 'iostream',
-		    STD => 'cstdlib',
-		    SNIPPET => '  std::cout << "Project -> \"" << PROJECT_NAME << "\"." << std::endl;',
-		    HEADER => 'hh',
-		    SOURCE => 'cc',
-		    UNUSED => 'UNUSED (argc, argv);\n',
-		    EXIT_STATUS => 'EXIT_SUCCESS',
-		    MORE_HEADERS => '',
-		   };
-
-    if ($options{qt}) {
-      $self->{CXX}->{SNIPPET} = <<'SNIPPET';
-  QApplication app (argc, argv);
-  QMainWindow window;
-  window.setWindowTitle (PROJECT_NAME_STR);
-  window.resize (600, 480);
-  window.move (QApplication::desktop ()->screen ()->rect ().center ()
-	       - window.rect ().center ());
-  window.show ();
-SNIPPET
-
-      $self->{CXX}->{EXIT_STATUS} = 'app.exec ()';
-      $self->{CXX}->{UNUSED} = '';
-      $self->{CXX}->{MORE_HEADERS} = <<'MORE_HEADERS';
-#include <QApplication>
-#include <QDesktopWidget>
-#include <QMainWindow>
-MORE_HEADERS
-    }
-  }
+  my $self = {};
 
   bless $self, $class;
 }
 
+sub configure {
+  my $self = shift;
+  $self->{name} = trim $self->{name};
+  my $name = __sanitize_file_name lc $self->{name};
+  $self->{path} = abs_path $name;
+  $self->{base_path} = dirname abs_path __FILE__;
+  $self->{macro} = __get_macro_identifier $self->{name};
+
+  $self->{template}->{args} = {APP_NAME => $name,
+			       PROJECT => $self->{name},
+			       BASE_PATH => $self->{path},
+			       LANG => $self->{language},
+			       PROJECT_MACRO => $self->{macro},
+			      };
+
+  $self->{template}->{files} = ['CMakeLists.txt',
+				'.dir-locals.el',];
+
+  $self->{files} = ['.dir-locals.el'];
+
+  if (-d $self->{path}) {
+    croak "Directory \"$self->{path}\" exists!";
+  }
+}
+
+sub create {
+  my $self = shift;
+  make_path catdir $self->{path}, 'src';
+  $self->write_readme;
+
+  for my $file (qw/vendor res cmake docs t notes/) {
+    my $src = catdir $self->{base_path}, $file;
+    my $dest = catdir $self->{path}, $file;
+    dircopy $src, $dest;
+  }
+
+  copy $self->{source_file_src}, $self->{source_file_dest};
+  copy $self->{header_file_src}, $self->{header_file_dest};
+
+  for my $file (@{$self->{files}}) {
+    my $src = catdir $self->{base_path}, $file;
+    my $dest = catdir $self->{path}, $file;
+    copy $src, $dest;
+  }
+
+  copy $self->{cmake_listfile_src}, $self->{cmake_listfile_dest};
+  $self->process_templates;
+}
+
+sub write_readme {
+  my $self = shift;
+  my $readme = catdir $self->{path}, 'readme.rst';
+  open (my $README_FH, '>', $readme);
+  my $decorations = '#' x (2 + length $self->{name});
+
+  say {$README_FH} $decorations;
+  say {$README_FH} sprintf ' %s', $self->{name};
+  say {$README_FH} $decorations, "\n";
+  say {$README_FH} $self->{description};
+
+  close $README_FH;
+}
+
 sub process_templates {
   my $self = shift;
-  my %params = @_;
-
-  my $files = delete $params{files};
-  my ($IN, $OUT, @param_vars) = (undef, undef, (keys %params));
-  # my @templates = ());
-
-  for my $file (@$files) {
-    open ($IN, '<', catdir ($self->{base_dir}, $file));
-    open ($OUT, '>', catdir ($self->{project_dirpath}, $file));
-
-    while (my $line = readline $IN) {
+  my $tmp = File::Temp->new (CLEANUP => 1,
+			     TMPDIR => 1,
+			     TEMPLATE => 'cproj-XXXXXXX');
+  my @variables = keys %{$self->{template}->{args}};
+  for my $file (@{$self->{template}->{files}}) {
+    my $path = catdir $self->{path}, $file;
+    copy $path, $tmp->filename;
+    $tmp->seek (0, SEEK_SET);
+    open (my $OUT_FH, '>', $path);
+    while (my $line = $tmp->getline) {
       chomp $line;
-      for my $param (@param_vars) {
-  	$line =~ s/%$param%/$params{$param}/g;
+      for my $var (@variables) {
+	$line =~ s|<\?\s*$var\s+\?>|$self->{template}->{args}->{$var}|;
       }
-      say {$OUT} $line;
-    }
-    close $IN;
-    close $OUT;
-    $IN = $OUT = undef;
-  }
-}
-
-sub run {
-  my $self = shift;
-
-  if (-d $self->{project_dirpath}) {
-    die "`$self->{project_dirname}' exists! Try a diferent name.\n";
-  }
-  make_path $self->{project_dirpath};
-
-  for my $dirent (@{$self->{manifest}}) {
-    my $src_path = catdir $self->{base_dir}, $dirent;
-    my $dest_path = catdir $self->{project_dirpath}, $dirent;
-    CProjectCli::Utils->copy_file ($src_path, $dest_path);
-  }
-
-  $self->process_templates (files => ['CMakeLists.txt', 'readme.rst',
-				      '.dir-locals.el',
-				      catdir ('src', 'config.h.in'),
-				      catdir ('src', 'main.c'),],
-			    APP_NAME => $self->{project_dirname},
-			    PROJECT => $self->{project_name},
-			    PROJECT_MACRO =>
-			    CProjectCli::Utils->
-			    convert_to_macro_identifier (
-			    $self->{project_dirname}),
-			    USER => $ENV{USER},
-			    EMAIL => "$ENV{USER}\@localhost",
-			    DIR_PATH => $self->{project_dirpath},
-			    DESCRIPTION => $self->{description},
-			    LANG => $self->{language},
-			    %{$self->{$self->{language}}},
-			   );
-
-  my $fh = File::Temp->new (TEMPLATE => "cproj-XXXXXXXXX",
-			    SUFFIX => '.rst',
-			    CLEANUP => 1,
-			    TMPDIR => 1);
-
-  my $readme_fname = catdir $self->{project_dirpath}, 'readme.rst';
-
-  CProjectCli::Utils->copy_file ($readme_fname, $fh->filename, 1);
-
-  open (my $README_FH, '>', $readme_fname);
-  $fh->seek (0, SEEK_SET);
-
-  my $section_set = 0;
-  while (my $line = $fh->getline ()) {
-    chomp $line;
-
-    next if $line =~ /^(#|\*|=|-|~){3,}/;
-
-    unless ($section_set) {
-      my $len = length ($line) + 2;
-      say {$README_FH} '#' x $len;
-      say {$README_FH} sprintf (' %s', $line);
-      say {$README_FH} '#' x $len;
-      $section_set = 1;
-      next;
-    }
-
-    say {$README_FH} $line;
-  }
-
-  if ($self->{language} eq 'CXX') {
-    for my $file (qw/config.h.in main.c/) {
-      my $old_file = catdir $self->{project_dirpath}, 'src', $file;
-      my $new_file = $old_file;
-      $new_file =~ s%\.h%.hh%;
-      $new_file =~ s%\.c%\.cc%;
-      rename $old_file, $new_file;
+      say {$OUT_FH} $line;
     }
   }
 }
 
+sub __sanitize_file_name {
+  my $name = trim lc $_[0];
+  $name =~ s/(\s|_)+/-/g;
 
-package CProjectCli::Utils;
-
-use 5.020;
-use warnings q/all/;
-use autodie;
-
-use File::Copy qw/copy/;
-use File::Basename qw/dirname/;
-use File::Path qw/make_path/;
-
-sub usage {
-  die "[USAGE]:\n\tcproj new <project-name>\n";
+  return $name;
 }
 
-sub convert_to_macro_identifier {
-  shift;
+sub __get_macro_identifier {
   my $name = uc shift;
 
   $name =~ s/(\W|^\d)/_/g;
@@ -241,26 +126,172 @@ sub convert_to_macro_identifier {
   return $name;
 }
 
-sub convert_to_file_name {
-  my $name = lc $_[1];
-  $name =~ s/(\s|_)+/-/g;
 
-  return $name;
+package CCliProject;
+use base qw/CliProject/;
+
+use File::Spec::Functions qw/catdir/;
+
+sub new {
+  my $class = shift;
+  my $self = { %{$_[0]} };
+
+  bless $self, $class;
 }
 
-sub copy_file {
-  my ($self, $src, $dest, $overwrite) = @_;
+sub configure {
+  my $self = shift;
+  $self->SUPER::configure;
+  $self->{template}->{args}->{HEADER} = 'h';
+  $self->{template}->{args}->{SOURCE} = 'c';
+  $self->{template}->{args}->{HEADER_FOR_MACRO} = 'H';
 
-  return if -e $dest && !$overwrite;
+  $self->{source_file_src} = catdir $self->{base_path}, qw/src main.c/;
+  $self->{source_file_dest} = catdir $self->{path}, qw/src main.c/;
 
-  if (-f $src) {
-    my $dest_dname = dirname $dest;
-    make_path $dest_dname unless -e $dest_dname;
-    copy $src, $dest;
+  $self->{header_file_src} = catdir $self->{base_path}, qw/src config.h.in/;
+  $self->{header_file_dest} = catdir $self->{path}, qw/src config.h.in/;
+
+  push @{$self->{template}->{files}}, catdir ('src', 'config.h.in');
+
+  $self->{cmake_listfile_src} = catdir $self->{base_path}, qw/CMakeLists.txt/;
+  $self->{cmake_listfile_dest} = catdir $self->{path}, qw/CMakeLists.txt/;
+}
+
+package CxxCliProject;
+use base qw/CCliProject/;
+
+use File::Spec::Functions qw/catdir/;
+
+sub new {
+  my $class = shift;
+  my $self = { %{$_[0]} };
+
+  bless $self, $class;
+}
+
+sub configure {
+  my $self = shift;
+  $self->SUPER::configure;
+  $self->{template}->{args}->{HEADER} = 'hh';
+  $self->{template}->{args}->{SOURCE} = 'cc';
+  $self->{template}->{args}->{HEADER_FOR_MACRO} = 'HH';
+
+  $self->{source_file_src} = catdir $self->{base_path}, qw/src main.cc/;
+  $self->{source_file_dest} = catdir $self->{path}, qw/src main.cc/;
+
+  $self->{header_file_src} = catdir $self->{base_path}, qw/src config.h.in/;
+  $self->{header_file_dest} = catdir $self->{path}, qw/src config.hh.in/;
+
+  push @{$self->{template}->{files}}, catdir ('src', 'config.hh.in');
+}
+
+package CxxQtCliProject;
+use base qw/CxxCliProject/;
+
+use File::Copy qw/copy/;
+use File::Spec::Functions qw/catdir/;
+
+sub new {
+  my $class = shift;
+  my $self = { %{$_[0]} };
+
+  bless $self, $class;
+}
+
+sub configure {
+  my $self = shift;
+  $self->SUPER::configure;
+  $self->{source_file_src} = catdir $self->{base_path}, qw/src main-qt.cc/;
+  $self->{cmake_listfile_src} = catdir $self->{base_path}, qw/CMakeLists-qt.cmake/;
+  $self->{cmake_listfile_dest} = catdir $self->{path}, qw/CMakeLists.txt/;
+}
+
+
+package CliProjectCreator;
+use 5.024;
+use warnings;
+
+use Getopt::Long;
+use Pod::Usage;
+use Carp qw/croak/;
+
+sub create_project {
+  my @cli_args = @main::ARGV;
+  if (scalar @cli_args < 2 || $cli_args[0] ne 'new') {
+    pod2usage;
+  }
+
+  shift @cli_args;
+  my $name = shift @cli_args;
+
+  my %cli_options = (
+        description => 'A simple project template.',
+        language => 'C',
+  );
+  my $parser = Getopt::Long::Parser->new;
+  $parser->configure (qw/bundling no_ignore_case/);
+  $parser->getoptionsfromarray (\@ARGV,
+				'language|l=s' => \$cli_options{language},
+				'description|d=s' => \$cli_options{description},
+				'qt|q' => \$cli_options{qt},
+			       ) || pod2usage;
+
+  my $is_qt = delete $cli_options{qt};
+  my $project_info = {name => $name,
+		      %cli_options};
+
+  $project_info->{language} = uc $project_info->{language};
+  if ($project_info->{language} eq 'C') {
+    delete $project_info->{qt};
+    return CCliProject->new ($project_info);
+  }
+  elsif ($project_info->{language} eq 'CXX') {
+    if ($is_qt) {
+      return CxxQtCliProject->new ($project_info);
+    }
+    delete $project_info->{qt};
+    return CxxCliProject->new ($project_info);
+  }
+  else {
+    croak 'Invalid value for \'--language\'';
   }
 }
 
 
 package main;
 
-CProject->new->run;
+my $project = CliProjectCreator->create_project;
+$project->configure;
+$project->create;
+
+
+__END__
+
+=head1 NAME
+
+cproj - a simple C and C++ command line project skeleton generator.
+
+=head1 SYNOPSIS
+
+cproj new <project-name> [options]
+
+  Options:
+    --language, -l         the target language.
+    --description, -d      project description.
+
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<--language>
+
+Chooses the target language, valid options are C or CXX, for C Language
+and C++ Language, respectively.
+
+=item B<--description>
+
+A Brief descritpion of the new project.
+
+=cut

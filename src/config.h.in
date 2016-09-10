@@ -1,9 +1,9 @@
 // -*- c -*-
 
-#ifndef %PROJECT_MACRO%_SRC_CONFIG
-#define %PROJECT_MACRO%_SRC_CONFIG 1
+#ifndef <? PROJECT_MACRO ?>_SRC_CONFIG_<? HEADER_FOR_MACRO ?>
+#define <? PROJECT_MACRO ?>_SRC_CONFIG_<? HEADER_FOR_MACRO ?>  1
 
-#define PROJECT_NAME "%PROJECT%"
+#define PROJECT_NAME "<? PROJECT ?>"
 
 #ifdef UNUSED
   #undef UNUSED
@@ -57,4 +57,4 @@ _UNUSED_LEVEL_3, _UNUSED_LEVEL_2, _UNUSED_LEVEL_1, 0
 #define NUL '\0'
 #endif  /* NUL */
 
-#endif /* %PROJECT_MACRO%_SRC_CONFIG */
+#endif /* <? PROJECT_MACRO ?>_SRC_CONFIG_<? HEADER_FOR_MACRO ?> */

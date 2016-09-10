@@ -4,8 +4,8 @@
 	      (make-local-variable var))
 	    (setq-local company-c-headers-path-user
 			(mapcar #'(lambda (directory)
-				    (let ((base-directory "%DIR_PATH%"))
-				      (concat base-directory "/" directory))) '("build/debug" "src" "build/release"
+				    (let ((base-path "<? BASE_PATH ?>"))
+				      (concat base-path "/" directory))) '("build/debug" "src" "build/release"
 										"src")))
 	    (setq-local company-clang-arguments (mapcar #'(lambda (include-directory)
 							    (concat "-I" include-directory))

@@ -9,10 +9,21 @@ cmake_policy (SET CMP0054 NEW)
 
 project (<? APP_NAME ?> LANGUAGES <? LANG ?>)
 
+set (CMAKE_AUTOMOC ON)
+set (CMAKE_AUTOUIC ON)
+set (CMAKE_AUTORCC ON)
+
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
+find_package (Qt5Widgets CONFIG)
+
 
 include_directories ("${CMAKE_BINARY_DIR}"
                      "${CMAKE_SOURCE_DIR}/src")
+
+link_libraries (${PROJECT_NAME}
+  Qt5::Widgets
+)
 
 include (Utils)
 
