@@ -1,13 +1,14 @@
-#include "config.h"
+#include "%CONFIG%"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <%IO%>
+#include <%STD%>
 
+%MORE_HEADERS%
 int
 main (int argc, char* argv[]) {
-  UNUSED (argc, argv);
+  %UNUSED%
 
-  puts (PROJECT_NAME);
+%SNIPPET%
 
-  return EXIT_SUCCESS;
+  return %EXIT_STATUS%;
 }

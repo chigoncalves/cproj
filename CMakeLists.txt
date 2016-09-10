@@ -7,7 +7,7 @@ endif ()
 cmake_minimum_required (VERSION 3.0)
 cmake_policy (SET CMP0054 NEW)
 
-project (%APP_NAME% LANGUAGES C)
+project (%APP_NAME% LANGUAGES %LANG%)
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -16,9 +16,9 @@ include_directories ("${CMAKE_BINARY_DIR}"
 
 include (Utils)
 
-configure_file ("${CMAKE_SOURCE_DIR}/src/config.h.in"
-                "${CMAKE_BINARY_DIR}/config.h"
+configure_file ("${CMAKE_SOURCE_DIR}/src/config.%HEADER%.in"
+                "${CMAKE_BINARY_DIR}/config.%HEADER%"
 		@ONLY)
 
-set (SOURCES src/main.c)
+set (SOURCES src/main.%SOURCE%)
 add_executable (${PROJECT_NAME} ${SOURCES})

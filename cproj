@@ -12,29 +12,107 @@ use File::Spec::Functions qw/catdir/;
 use YAML::Tiny;
 use File::Temp qw/:seekable/;
 use Env qw/HOME/;
+use Getopt::Long;
+use Carp qw/croak/;
 
 sub new {
   my $class = shift;
   my $self = {
        base_dir => dirname abs_path (__FILE__),
        manifest => [],
+       language => 'C',
+       description => 'Simple Project.',
   };
 
-  do {
-    my $doc = YAML::Tiny->read (catdir ($self->{base_dir},
-					'manifest.yml'));
-    $self->{manifest} = \@{${$doc->[0]}{'manifest'}};
+  my $doc = YAML::Tiny->read (catdir ($self->{base_dir},
+				      'manifest.yml'));
+  $self->{manifest} = \@{${$doc->[0]}{'manifest'}};
 
-  };
-
-  if (scalar @main::ARGV != 2 || $main::ARGV[0] ne 'new') {
+  my @ARGV = @main::ARGV;
+  if (scalar @ARGV < 2 || $ARGV[0] ne 'new') {
     CProjectCli::Utils->usage;
   }
 
-  $self->{project_name} = $main::ARGV[1];
-  $self->{project_dirname} = CProjectCli::Utils->
-    convert_to_file_name ($self->{project_name});
+  shift @ARGV;
+  $self->{project_name} = shift @ARGV;
+  $self->{project_dirname} = CProjectCli::Utils->convert_to_file_name ($self->{project_name});
   $self->{project_dirpath} = abs_path $self->{project_dirname};
+
+  my $parser = Getopt::Long::Parser->new;
+  my %options = (language => 'c',
+		 description => 'Simple Project.',
+		 qt => 0);
+  $parser->getoptionsfromarray (\@ARGV,
+				'language|l=s' => \$options{language},
+				'description|d=s' => \$options{description},
+				'qt|q' => \$options{qt},
+			       )
+    ;
+
+  $self->{language} = delete $options{language};
+  $self->{description} = delete $options{description};
+
+  my $valid_language = 0;
+  $self->{language} = uc $self->{language};
+  for my $lang (qw/C CC CXX CPP/) {
+    if ($lang eq $self->{language}) {
+      $valid_language = 1;
+      last;
+    }
+  }
+
+  unless ($valid_language) {
+    croak 'Invalid language! Language must be one of C or [CC, CXX, CPP]';
+  }
+
+  if ($self->{language} eq 'C') {
+    $self->{C} = {
+		  CONFIG => 'config.h',
+		  IO => 'stdio.h',
+		  STD => 'stdlib.h',
+		  SNIPPET => '  printf ("Project -> \"%s\".\n", PROJECT_NAME);',
+		  HEADER => 'h',
+		  SOURCE => 'c',
+		  UNUSED => '  UNUSED (argc, argv);\n',
+		  EXIT_STATUS => 'EXIT_SUCCESS',
+		  MORE_HEADERS => '',
+		 };
+
+  }
+  else {
+    $self->{language} = 'CXX';
+    $self->{CXX} = {
+		    CONFIG => 'config.hh',
+		    IO => 'iostream',
+		    STD => 'cstdlib',
+		    SNIPPET => '  std::cout << "Project -> \"" << PROJECT_NAME << "\"." << std::endl;',
+		    HEADER => 'hh',
+		    SOURCE => 'cc',
+		    UNUSED => 'UNUSED (argc, argv);\n',
+		    EXIT_STATUS => 'EXIT_SUCCESS',
+		    MORE_HEADERS => '',
+		   };
+
+    if ($options{qt}) {
+      $self->{CXX}->{SNIPPET} = <<'SNIPPET';
+  QApplication app (argc, argv);
+  QMainWindow window;
+  window.setWindowTitle (PROJECT_NAME_STR);
+  window.resize (600, 480);
+  window.move (QApplication::desktop ()->screen ()->rect ().center ()
+	       - window.rect ().center ());
+  window.show ();
+SNIPPET
+
+      $self->{CXX}->{EXIT_STATUS} = 'app.exec ()';
+      $self->{CXX}->{UNUSED} = '';
+      $self->{CXX}->{MORE_HEADERS} = <<'MORE_HEADERS';
+#include <QApplication>
+#include <QDesktopWidget>
+#include <QMainWindow>
+MORE_HEADERS
+    }
+  }
 
   bless $self, $class;
 }
@@ -80,7 +158,8 @@ sub run {
 
   $self->process_templates (files => ['CMakeLists.txt', 'readme.rst',
 				      '.dir-locals.el',
-				      catdir ('src', 'config.h.in')],
+				      catdir ('src', 'config.h.in'),
+				      catdir ('src', 'main.c'),],
 			    APP_NAME => $self->{project_dirname},
 			    PROJECT => $self->{project_name},
 			    PROJECT_MACRO =>
@@ -90,6 +169,9 @@ sub run {
 			    USER => $ENV{USER},
 			    EMAIL => "$ENV{USER}\@localhost",
 			    DIR_PATH => $self->{project_dirpath},
+			    DESCRIPTION => $self->{description},
+			    LANG => $self->{language},
+			    %{$self->{$self->{language}}},
 			   );
 
   my $fh = File::Temp->new (TEMPLATE => "cproj-XXXXXXXXX",
@@ -120,6 +202,16 @@ sub run {
     }
 
     say {$README_FH} $line;
+  }
+
+  if ($self->{language} eq 'CXX') {
+    for my $file (qw/config.h.in main.c/) {
+      my $old_file = catdir $self->{project_dirpath}, 'src', $file;
+      my $new_file = $old_file;
+      $new_file =~ s%\.h%.hh%;
+      $new_file =~ s%\.c%\.cc%;
+      rename $old_file, $new_file;
+    }
   }
 }
 

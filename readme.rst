@@ -1,4 +1,4 @@
 %PROJECT%
 *********
 
-Generated content.
+%DESCRIPTION%
