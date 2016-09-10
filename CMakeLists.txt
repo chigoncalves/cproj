@@ -21,4 +21,8 @@ configure_file ("${CMAKE_SOURCE_DIR}/src/config.<? HEADER ?>.in"
 		@ONLY)
 
 set (SOURCES src/main.<? SOURCE ?>)
+
+add_subdirectory (t)
+add_subdirectory (vendor)
+
 add_executable (${PROJECT_NAME} ${SOURCES})
