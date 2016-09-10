@@ -37,7 +37,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   list (APPEND CMAKE_C_FLAGS_DEBUG -Wall -Wextra -Werror -std=c99
                                    -pedantic -Wwrite-strings)
   if (COMPILER_SUPPORTS_SAN)
-    set (SAN_BLACKLIST_FILE "${CMAKE_SOURCE_DIR}/blacklists.txt")
+    set (SAN_BLACKLIST_FILE "${CMAKE_SOURCE_DIR}/res/blacklists.txt")
     list (APPEND CMAKE_C_FLAGS_DEBUG -fPIE )
     list (APPEND CMAKE_EXE_LINKER_FLAGS_DEBUG -fno-omit-frame-pointer
                                               -pie)

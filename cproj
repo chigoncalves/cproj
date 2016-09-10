@@ -17,7 +17,6 @@ use File::Spec::Functions qw/catdir/;
 use File::Temp qw/:seekable/;
 use Text::Trim qw/trim/;
 
-
 sub new {
   my $class = shift;
   my $self = {};
@@ -72,6 +71,7 @@ sub create {
 
   copy $self->{cmake_listfile_src}, $self->{cmake_listfile_dest};
   $self->process_templates;
+  $self->init_vcs;
 }
 
 sub write_readme {
@@ -86,6 +86,33 @@ sub write_readme {
   say {$README_FH} $self->{description};
 
   close $README_FH;
+}
+
+sub init_vcs {
+  no warnings;
+  my $self = shift;
+  my @lines= qw|build/ notes/ .#* *~ _*|;
+  my $vcs_filename = '.gitignore';
+
+  if ($self->{version_system} eq 'HG') {
+    unshift @lines, 'syntax: glob';
+    $vcs_filename = '.hgignore';
+  }
+
+  $vcs_filename = catdir $self->{path}, $vcs_filename;
+  open (my $VCS_FH, '>', $vcs_filename);
+  chdir $self->{path};
+  for my $line (@lines) {
+    say {$VCS_FH} $line;
+  }
+
+  close $VCS_FH;
+  my $command = 'git init . 2> /dev/null';
+  if ($self->{version_system} eq 'HG') {
+    $command = 'hg init . 2> /dev/null';
+  }
+
+  system $command;
 }
 
 sub process_templates {
@@ -158,6 +185,7 @@ sub configure {
   $self->{cmake_listfile_dest} = catdir $self->{path}, qw/CMakeLists.txt/;
 }
 
+
 package CxxCliProject;
 use base qw/CCliProject/;
 
@@ -186,6 +214,7 @@ sub configure {
   push @{$self->{template}->{files}}, catdir ('src', 'config.hh.in');
 }
 
+
 package CxxQtCliProject;
 use base qw/CxxCliProject/;
 
@@ -212,9 +241,9 @@ package CliProjectCreator;
 use 5.024;
 use warnings;
 
+use Carp qw/croak/;
 use Getopt::Long;
 use Pod::Usage;
-use Carp qw/croak/;
 
 sub create_project {
   my @cli_args = @main::ARGV;
@@ -228,6 +257,7 @@ sub create_project {
   my %cli_options = (
         description => 'A simple project template.',
         language => 'C',
+        version_system => 'HG',
   );
   my $parser = Getopt::Long::Parser->new;
   $parser->configure (qw/bundling no_ignore_case/);
@@ -235,11 +265,18 @@ sub create_project {
 				'language|l=s' => \$cli_options{language},
 				'description|d=s' => \$cli_options{description},
 				'qt|q' => \$cli_options{qt},
+				'version-system|v=s' => \$cli_options{version_system},
 			       ) || pod2usage;
 
   my $is_qt = delete $cli_options{qt};
   my $project_info = {name => $name,
 		      %cli_options};
+
+  $cli_options{version_system} = uc $cli_options{version_system};
+  if ($cli_options{version_system} ne 'HG'
+      && $cli_options{version_system} ne 'GIT') {
+    croak 'Invalid value for \"version-system\".';
+  }
 
   $project_info->{language} = uc $project_info->{language};
   if ($project_info->{language} eq 'C') {
