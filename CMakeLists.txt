@@ -9,10 +9,10 @@ cmake_policy (SET CMP0054 NEW)
 
 project (<? APP_NAME ?> LANGUAGES <? LANG ?>)
 
+set (CMAKE_INCLUDE_CURRENT_DIR ON)
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
-include_directories ("${CMAKE_BINARY_DIR}"
-                     "${CMAKE_SOURCE_DIR}/src")
+include_directories ("${CMAKE_SOURCE_DIR}/src")
 
 include (Utils)
 
