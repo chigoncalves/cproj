@@ -14,18 +14,10 @@ set (CMAKE_AUTOUIC ON)
 set (CMAKE_AUTORCC ON)
 
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-
-find_package (Qt5Widgets CONFIG)
-
+include (Utils)
 
 include_directories ("${CMAKE_BINARY_DIR}"
                      "${CMAKE_SOURCE_DIR}/src")
-
-link_libraries (${PROJECT_NAME}
-  Qt5::Widgets
-)
-
-include (Utils)
 
 configure_file ("${CMAKE_SOURCE_DIR}/src/config.<? HEADER ?>.in"
                 "${CMAKE_BINARY_DIR}/config.<? HEADER ?>"
@@ -33,3 +25,8 @@ configure_file ("${CMAKE_SOURCE_DIR}/src/config.<? HEADER ?>.in"
 
 set (SOURCES src/main.<? SOURCE ?>)
 add_executable (${PROJECT_NAME} ${SOURCES})
+
+find_package (Qt5Widgets CONFIG)
+target_link_libraries (${PROJECT_NAME}
+                       PUBLIC
+			 Qt5::Widgets)

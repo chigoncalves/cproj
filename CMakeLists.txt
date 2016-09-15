@@ -11,9 +11,6 @@ project (<? APP_NAME ?> LANGUAGES <? LANG ?>)
 
 set (CMAKE_INCLUDE_CURRENT_DIR ON)
 list (APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
-
-include_directories ("${CMAKE_SOURCE_DIR}/src")
-
 include (Utils)
 
 configure_file ("${CMAKE_SOURCE_DIR}/src/config.<? HEADER ?>.in"
