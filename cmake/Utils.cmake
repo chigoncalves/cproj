@@ -1,6 +1,12 @@
 set (CMAKE_POSITION_INDEPENDENT_CODE ON)
+set (CMAKE_INCLUDE_CURRENT_DIR_IN_INTERFACE ON)
+set (CMAKE_INCLUDE_CURRENT_DIR ON)
+set (CMAKE_C_STANDARD 99)
 
-set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set (CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/bin")
+set (CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
+set (CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
+set (CMAKE_DEBUG_POSTFIX d)
 
 if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE "Release")
@@ -10,7 +16,7 @@ if (NOT DEFINED BUILD_SHARED_LIBS)
   set (BUILD_SHARED_LIBS ON)
 endif ()
 
-macro (list_stringfy VARNAME)
+macro (list_to_string VARNAME)
   list (REMOVE_DUPLICATES ${VARNAME})
   string (REPLACE ";" " " ${VARNAME} "${${VARNAME}}")
 endmacro ()
@@ -40,7 +46,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 				   -Werror
 				   -std=c99
                                    -pedantic
-				   -Wwrite-strings)
+				   # -Wwrite-strings
+				   )
   if (COMPILER_SUPPORTS_SAN)
     set (SAN_BLACKLIST_FILE "${CMAKE_SOURCE_DIR}/res/blacklists.txt")
     list (APPEND CMAKE_C_FLAGS_DEBUG -fPIE )
@@ -66,8 +73,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     endif ()
   endif ()
 
-  list_stringfy (CMAKE_C_FLAGS_DEBUG)
-  list_stringfy (CMAKE_EXE_LINKER_FLAGS_DEBUG)
+  list_to_string (CMAKE_C_FLAGS_DEBUG)
+  list_to_string (CMAKE_EXE_LINKER_FLAGS_DEBUG)
 endif ()
 
 mark_as_advanced (COMILER_SUPPORTS_SAN
